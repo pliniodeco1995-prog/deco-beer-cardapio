@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -5,6 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Cardápio | Deco Beer</title>
 <style>
+* { box-sizing: border-box; }
 body {
   margin: 0;
   background: #111;
@@ -14,29 +16,51 @@ body {
 header {
   background: #000;
   text-align: center;
-  padding: 28px 12px;
+  padding: 30px 12px;
   border-bottom: 3px solid #ffcc29;
 }
-h1 { margin: 0; font-size: 32px; }
+h1 { margin: 0; font-size: 34px; }
 h1 span { color: #ffcc29; }
 header p { color: #ddd; }
-main { padding: 18px; max-width: 700px; margin: auto; }
+main {
+  padding: 18px;
+  max-width: 750px;
+  margin: auto;
+}
 h2 {
   color: #ffcc29;
   border-bottom: 1px solid #ffcc29;
   padding-bottom: 10px;
+  margin-top: 30px;
 }
 .produto {
   background: #242424;
-  padding: 18px;
+  padding: 14px;
   margin: 12px 0;
   border-radius: 12px;
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  align-items: center;
+  gap: 15px;
 }
-.preco { color: #ffcc29; font-weight: bold; }
-footer { text-align: center; padding: 25px; }
+.produto img {
+  width: 85px;
+  height: 85px;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.info { flex: 1; }
+.nome { font-weight: bold; }
+.preco {
+  color: #ffcc29;
+  font-weight: bold;
+  margin-top: 8px;
+  font-size: 19px;
+}
+footer {
+  text-align: center;
+  padding: 25px;
+  color: #ddd;
+}
 </style>
 </head>
 <body>
@@ -44,17 +68,101 @@ footer { text-align: center; padding: 25px; }
 <h1>DECO <span>BEER</span></h1>
 <p>Cardápio Digital</p>
 </header>
-<main>
-<h2>Cervejas 600 ml</h2>
-<div class="produto">Heineken <span class="preco">R$ 13,99</span></div>
-<div class="produto">Stella Pure Gold <span class="preco">R$ 14,99</span></div>
-<div class="produto">Original <span class="preco">R$ 11,99</span></div>
-<div class="produto">Skol <span class="preco">R$ 9,99</span></div>
-<div class="produto">Amstel <span class="preco">R$ 9,99</span></div>
-<h2>Petiscos</h2>
-<div class="produto">Batata frita tradicional <span class="preco">R$ 25,99</span></div>
-<div class="produto">Frango à passarinho <span class="preco">R$ 29,99</span></div>
+
+<main id="cardapio">
+<p>Carregando cardápio...</p>
 </main>
-<footer>Beba bons momentos na melhor!<p>Vem ser feliz!</p></footer>
+
+<footer>
+Beba bons momentos na melhor!
+<p>Vem ser feliz!</p>
+</footer>
+
+<script type="module">
+import { initializeApp } from
+"https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+
+import { getFirestore, collection, onSnapshot }
+from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCWXguk__YE4voijGQW7SVrrRMdOnZAvMA",
+  authDomain: "deco-beer-cardapio.firebaseapp.com",
+  projectId: "deco-beer-cardapio",
+  storageBucket: "deco-beer-cardapio.firebasestorage.app",
+  messagingSenderId: "468103936613",
+  appId: "1:468103936613:web:6c8808df06a3b1f296648c",
+  measurementId: "G-MTMMD8T682"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const cardapio = document.getElementById("cardapio");
+
+const formatarPreco = valor =>
+  Number(valor).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL"
+  });
+
+function criarElemento(tag, classe, texto) {
+  const el = document.createElement(tag);
+  if (classe) el.className = classe;
+  if (texto !== undefined) el.textContent = texto;
+  return el;
+}
+
+onSnapshot(collection(db, "Produtos"), snapshot => {
+  cardapio.replaceChildren();
+
+  const categorias = {};
+
+  snapshot.forEach(doc => {
+    const produto = doc.data();
+    const categoria = produto.categoria || "Outros";
+    if (!categorias[categoria]) categorias[categoria] = [];
+    categorias[categoria].push(produto);
+  });
+
+  const nomes = Object.keys(categorias).sort((a,b) =>
+    a.localeCompare(b, "pt-BR")
+  );
+
+  if (!nomes.length) {
+    cardapio.textContent = "Nenhum produto cadastrado.";
+    return;
+  }
+
+  nomes.forEach(categoria => {
+    cardapio.appendChild(criarElemento("h2", "", categoria));
+
+    categorias[categoria].sort((a,b) =>
+      String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR")
+    ).forEach(produto => {
+      const item = criarElemento("div", "produto");
+
+      const imagem = produto.imagens;
+      const url = Array.isArray(imagem) ? imagem[0] : imagem;
+
+      if (typeof url === "string" && /^https:\/\//i.test(url)) {
+        const img = document.createElement("img");
+        img.src = url;
+        img.alt = produto.nome || "Produto";
+        img.loading = "lazy";
+        item.appendChild(img);
+      }
+
+      const info = criarElemento("div", "info");
+      info.appendChild(criarElemento("div", "nome", produto.nome || "Produto"));
+      info.appendChild(criarElemento("div", "preco", formatarPreco(produto.preco || 0)));
+      item.appendChild(info);
+      cardapio.appendChild(item);
+    });
+  });
+}, erro => {
+  console.error(erro);
+  cardapio.textContent = "Não foi possível carregar o cardápio.";
+});
+</script>
 </body>
 </html>
